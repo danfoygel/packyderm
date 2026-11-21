@@ -47,7 +47,7 @@ struct WeatherSummaryCard: View {
         var lines: [String] = []
         if let wettest = summary.wettestDay, wettest.rainChance >= 30 {
             let rainy = summary.rainyDayCount
-            var line = "Wettest: \(wettest.date.formatted(.dateTime.weekday(.wide))) (\(Int(wettest.rainChance))%)"
+            var line = "Wettest: \(wettest.date.formatted(.dateTime.weekday(.wide))) (\(Int(wettest.rainChance.rounded()))%)"
             if rainy > 1 { line += " · \(rainy) likely-rain days" }
             lines.append(line)
         }
