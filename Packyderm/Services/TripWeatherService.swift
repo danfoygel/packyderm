@@ -61,16 +61,23 @@ struct TripWeatherService {
 
     private func historical(place: Place, from start: Date, to end: Date) async throws -> [DayWeather] {
         var samples: [DayWeather] = []
+        var lastError: Error?
         for yearsBack in 1...Self.historyYears {
             guard let s = calendar.date(byAdding: .year, value: -yearsBack, to: start),
-                  let e = calendar.date(byAdding: .year, value: -yearsBack, to: end),
-                  let days = try? await dailyWeather(place: place, from: s, to: e) else { continue }
+                  let e = calendar.date(byAdding: .year, value: -yearsBack, to: end) else { continue }
+            let days: [WeatherKit.DayWeather]
+            do {
+                days = try await dailyWeather(place: place, from: s, to: e)
+            } catch {
+                lastError = error
+                continue
+            }
             for day in days {
                 guard let shifted = calendar.date(byAdding: .year, value: yearsBack, to: localDay(day.date, place: place)) else { continue }
                 samples.append(convert(day, place: place, date: shifted, rainChance: 0, source: .historical))
             }
         }
-        guard !samples.isEmpty else { throw TripWeatherError.noData }
+        guard !samples.isEmpty else { throw lastError ?? TripWeatherError.noData }
 
         // Average each calendar day across the years we got.
         let grouped = Dictionary(grouping: samples) { $0.date }
@@ -99,7 +106,12 @@ struct TripWeatherService {
         // Pad a day each side: WeatherKit days begin at local midnight in the destination's time zone.
         let queryStart = calendar.date(byAdding: .day, value: -1, to: start)!
         let queryEnd = calendar.date(byAdding: .day, value: 2, to: end)!
-        let forecast = try await service.weather(for: place.location, including: .daily(startDate: queryStart, endDate: queryEnd))
+        let forecast: Forecast<WeatherKit.DayWeather>
+        do {
+            forecast = try await service.weather(for: place.location, including: .daily(startDate: queryStart, endDate: queryEnd))
+        } catch {
+            throw TripWeatherError.unavailable(error)
+        }
         return forecast.forecast.filter {
             let day = localDay($0.date, place: place)
             return day >= start && day <= end
@@ -137,8 +149,12 @@ struct TripWeatherService {
 
 enum TripWeatherError: LocalizedError {
     case noData
+    case unavailable(Error)
 
     var errorDescription: String? {
-        "No weather data available for these dates."
+        switch self {
+        case .noData: "No weather data available for these dates."
+        case .unavailable: "Couldn't reach Apple Weather. Check your connection and that WeatherKit is enabled for this app."
+        }
     }
 }
