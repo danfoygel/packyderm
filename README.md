@@ -15,6 +15,11 @@ up to ~30 minutes to start working.
 
 Debug builds can seed sample travel events into the simulator's calendar: launch with `-demoCalendar YES`.
 
+## App Store
+
+`appstore/SUBMISSION.md` has every App Store Connect field and `appstore/screenshots/` the screenshots. The support
+and privacy pages in `docs/` are served by GitHub Pages at <https://danfoygel.github.io/packyderm/>.
+
 ## How it works
 
 | Feature | Where |
