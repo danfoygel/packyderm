@@ -28,6 +28,17 @@ struct DetectedTrip: Identifiable, Hashable {
     }
 }
 
+/// The calendars the user chose for trip detection, stored under `SettingsKey.calendarIDs`.
+enum CalendarSelection {
+    static func decode(_ raw: String) -> Set<String> {
+        Set(raw.split(separator: "\n").map(String.init))
+    }
+
+    static func encode(_ ids: Set<String>) -> String {
+        ids.sorted().joined(separator: "\n")
+    }
+}
+
 /// Reads upcoming calendar events and guesses where the user will be on each day.
 ///
 /// Signals, strongest first:
@@ -64,6 +75,38 @@ final class CalendarTripDetector {
     }
 
     /// `carried`: a day between a flight out and the next flight, spent at the flight's destination.
+    /// Event calendars the user can choose from, in display order.
+    func selectableCalendars() -> [EKCalendar] {
+        store.calendars(for: .event)
+            .filter { $0.type != .birthday }
+            .sorted { ($0.source.title, $0.title) < ($1.source.title, $1.title) }
+    }
+
+    /// The chosen calendars that still exist on this device; empty if none do (identifiers can change when an
+    /// account is re-added), which means asking again.
+    func calendars(withIDs ids: Set<String>) -> [EKCalendar] {
+        selectableCalendars().filter { ids.contains($0.calendarIdentifier) }
+    }
+
+    /// Calendars to pre-check the first time: the default calendar for new events, plus any with an upcoming flight.
+    func suggestedCalendarIDs(lookaheadDays: Int) -> Set<String> {
+        var ids: Set<String> = []
+        if let calendar = store.defaultCalendarForNewEvents { ids.insert(calendar.calendarIdentifier) }
+        for event in upcomingEvents(lookaheadDays: lookaheadDays, calendars: nil) where Self.looksLikeFlight(event.title ?? "") {
+            ids.insert(event.calendar.calendarIdentifier)
+        }
+        return ids
+    }
+
+    private func upcomingEvents(lookaheadDays: Int, calendars: [EKCalendar]?) -> [EKEvent] {
+        let today = calendar.startOfDay(for: .now)
+        guard let horizon = calendar.date(byAdding: .day, value: lookaheadDays, to: today) else { return [] }
+        let predicate = store.predicateForEvents(withStart: today, end: horizon, calendars: calendars)
+        return store.events(matching: predicate)
+            .filter { $0.calendar.type != .birthday }
+            .sorted { $0.startDate < $1.startDate }
+    }
+
     private enum Kind: Int { case carried = 0, event, stay, lodging, flight }
 
     private struct Signal {
@@ -75,21 +118,16 @@ final class CalendarTripDetector {
         var isHome: Bool
     }
 
-    func detectTrips(home: Place, lookaheadDays: Int) async -> [DetectedTrip] {
-        let today = calendar.startOfDay(for: .now)
-        guard let horizon = calendar.date(byAdding: .day, value: lookaheadDays, to: today) else { return [] }
-        let predicate = store.predicateForEvents(withStart: today, end: horizon, calendars: nil)
-        let events = store.events(matching: predicate)
-            .filter { $0.calendar.type != .birthday }
-            .sorted { $0.startDate < $1.startDate }
-
+    func detectTrips(home: Place, lookaheadDays: Int, calendars: [EKCalendar]) async -> [DetectedTrip] {
+        // An empty list would mean "all calendars" to EventKit.
+        guard !calendars.isEmpty else { return [] }
         var signals: [Signal] = []
-        for event in events {
+        for event in upcomingEvents(lookaheadDays: lookaheadDays, calendars: calendars) {
             if let signal = await signal(for: event, home: home) {
                 signals.append(signal)
             }
         }
-        return buildTrips(from: signals, today: today)
+        return buildTrips(from: signals, today: calendar.startOfDay(for: .now))
     }
 
     // MARK: Event → signal

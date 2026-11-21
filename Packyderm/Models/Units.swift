@@ -17,6 +17,8 @@ enum SettingsKey {
     static let homeLatitude = "homeLatitude"
     static let homeLongitude = "homeLongitude"
     static let lookaheadDays = "lookaheadDays"
+    /// Newline-separated `EKCalendar.calendarIdentifier`s that trip detection reads; empty until the user chooses.
+    static let calendarIDs = "calendarIDs"
     static let speechRate = "speechRate"
     static let pauseBetweenItems = "pauseBetweenItems"
     static let listenTimeout = "listenTimeout"

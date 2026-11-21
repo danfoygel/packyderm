@@ -1,7 +1,8 @@
+import EventKit
 import SwiftData
 import SwiftUI
 
-/// New Trip: scan calendar → pick a detected trip → confirm/edit legs → create and fetch weather.
+/// New Trip: choose calendars (first time only) → scan calendar → pick a detected trip → confirm/edit legs → create and fetch weather.
 struct NewTripFlow: View {
     var onCreated: (Trip) -> Void
 
@@ -12,9 +13,10 @@ struct NewTripFlow: View {
     @AppStorage(SettingsKey.homeLatitude) private var homeLatitude = 0.0
     @AppStorage(SettingsKey.homeLongitude) private var homeLongitude = 0.0
     @AppStorage(SettingsKey.lookaheadDays) private var lookaheadDays = 60
+    @AppStorage(SettingsKey.calendarIDs) private var calendarIDs = ""
 
     private enum Phase {
-        case needsHome, scanning, noAccess, results([DetectedTrip]), confirm, creating
+        case needsHome, scanning, noAccess, chooseCalendars([EKCalendar]), results([DetectedTrip]), confirm, creating
     }
 
     @State private var phase: Phase = .scanning
@@ -22,6 +24,8 @@ struct NewTripFlow: View {
     @State private var draftLegs: [DetectedLeg] = []
     @State private var evidence: [String] = []
     @State private var error: String?
+    @State private var calendarDraft: Set<String> = []
+    @State private var detector = CalendarTripDetector()
 
     var body: some View {
         NavigationStack {
@@ -59,8 +63,15 @@ struct NewTripFlow: View {
                 Button("Enter trip manually") { startManual() }
                     .buttonStyle(.borderedProminent)
             }
+        case .chooseCalendars(let calendars):
+            CalendarChooser(calendars: calendars, selection: $calendarDraft) {
+                calendarIDs = CalendarSelection.encode(calendarDraft)
+                Task { await scan() }
+            }
         case .results(let trips):
-            DetectedTripsList(trips: trips, onPick: pick, onManual: startManual)
+            DetectedTripsList(trips: trips, onPick: pick, onManual: startManual, onChangeCalendars: {
+                chooseCalendars(preselecting: CalendarSelection.decode(calendarIDs))
+            })
         case .confirm:
             ItineraryEditor(name: $draftName, legs: $draftLegs, evidence: evidence) {
                 Task { await create() }
@@ -86,13 +97,22 @@ struct NewTripFlow: View {
     private func scan() async {
         guard let home else { phase = .needsHome; return }
         phase = .scanning
-        let detector = CalendarTripDetector()
         guard await detector.requestAccess() else {
             phase = .noAccess
             return
         }
-        let trips = await detector.detectTrips(home: home, lookaheadDays: lookaheadDays)
+        let calendars = detector.calendars(withIDs: CalendarSelection.decode(calendarIDs))
+        guard !calendars.isEmpty else {
+            chooseCalendars(preselecting: detector.suggestedCalendarIDs(lookaheadDays: lookaheadDays))
+            return
+        }
+        let trips = await detector.detectTrips(home: home, lookaheadDays: lookaheadDays, calendars: calendars)
         phase = .results(trips)
+    }
+
+    private func chooseCalendars(preselecting ids: Set<String>) {
+        calendarDraft = ids
+        phase = .chooseCalendars(detector.selectableCalendars())
     }
 
     private func pick(_ trip: DetectedTrip) {
@@ -130,6 +150,7 @@ private struct DetectedTripsList: View {
     let trips: [DetectedTrip]
     var onPick: (DetectedTrip) -> Void
     var onManual: () -> Void
+    var onChangeCalendars: () -> Void
 
     var body: some View {
         List {
@@ -158,7 +179,42 @@ private struct DetectedTripsList: View {
             }
             Section {
                 Button("Enter trip manually", systemImage: "square.and.pencil", action: onManual)
+                Button("Choose calendars", systemImage: "calendar", action: onChangeCalendars)
             }
+        }
+    }
+}
+
+// MARK: - Calendar chooser
+
+/// Shown the first time (or when the saved calendars are gone): which calendars are yours to scan.
+private struct CalendarChooser: View {
+    let calendars: [EKCalendar]
+    @Binding var selection: Set<String>
+    var onContinue: () -> Void
+
+    var body: some View {
+        List {
+            Section {
+                Text("Which calendars have your plans? Leave out shared calendars like family members', coworkers', and holidays, so their trips aren't mistaken for yours.")
+                    .foregroundStyle(.secondary)
+            }
+            CalendarChecklist(calendars: calendars, selection: $selection)
+            Section {
+                Text("You can change this later in Settings.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            Button(action: onContinue) {
+                Text(selection.isEmpty ? "Choose at least one calendar" : "Find trips")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(selection.isEmpty)
+            .padding()
         }
     }
 }

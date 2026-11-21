@@ -7,6 +7,7 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.homeLatitude) private var homeLatitude = 0.0
     @AppStorage(SettingsKey.homeLongitude) private var homeLongitude = 0.0
     @AppStorage(SettingsKey.lookaheadDays) private var lookaheadDays = 60
+    @AppStorage(SettingsKey.calendarIDs) private var calendarIDs = ""
     @AppStorage(SettingsKey.speechRate) private var speechRate = ReadAloudDefaults.rate
     @AppStorage(SettingsKey.pauseBetweenItems) private var pause = ReadAloudDefaults.pause
     @AppStorage(SettingsKey.listenTimeout) private var listenTimeout = ReadAloudDefaults.listenTimeout
@@ -37,14 +38,25 @@ struct SettingsView: View {
                 }
 
                 Section("Calendar") {
+                    NavigationLink {
+                        CalendarSettingsView()
+                    } label: {
+                        LabeledContent("Calendars", value: calendarCount)
+                    }
                     Stepper("Look ahead \(lookaheadDays) days", value: $lookaheadDays, in: 14...180, step: 7)
                 }
 
-                Section("Units") {
+                Section {
                     Picker("Temperature", selection: $unitRaw) {
                         ForEach(TemperatureUnit.allCases) { Text($0.symbol).tag($0.rawValue) }
                     }
                     .pickerStyle(.segmented)
+                } header: {
+                    Text("Units")
+                } footer: {
+                    Text(unitRaw == TemperatureUnit.fahrenheit.rawValue
+                         ? "Rain and snow in inches, wind in mph."
+                         : "Rain in mm, snow in cm, wind in km/h.")
                 }
 
                 Section("Read-aloud") {
@@ -62,6 +74,11 @@ struct SettingsView: View {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
         }
+    }
+
+    private var calendarCount: String {
+        let count = CalendarSelection.decode(calendarIDs).count
+        return count == 0 ? "Not chosen" : "\(count) selected"
     }
 
     private func setHome(_ place: Place) {
