@@ -29,7 +29,10 @@ Debug builds can seed sample travel events into the simulator's calendar: launch
 ### Calendar detection
 Looks ahead N days (Settings). Events count as travel when their location is >80 km from your home city, or their title
 looks like a flight (“Flight to Denver”, “BOS → DEN”), a stay (hotel / Airbnb / multi-day event), or “Trip to Paris”.
-Each day gets the strongest signal (stay > flight > event); away days with ≤2-day gaps form one trip; a flight home ends it.
+Each day gets the strongest signal (flight > hotel > multi-day event > event); away days with ≤2-day gaps form one trip; a
+flight home ends it. Between a flight out and the next flight (≤30 days later) you're assumed to be at the destination, and
+non-hotel events more than 300 km from it are ignored. Absence notices (“Kate PTO”, “OOO”, “Sabbatical”) and events
+someone else organized without inviting you are skipped, since shared calendars are full of other people's plans.
 Consecutive days within 40 km merge into one stop.
 
 ### Weather
