@@ -43,7 +43,11 @@ final class Geocoder {
     func cityName(for location: CLLocation) async -> String? {
         guard let request = MKReverseGeocodingRequest(location: location),
               let item = try? await request.mapItems.first else { return nil }
-        return item.addressRepresentations?.cityWithContext ?? item.addressRepresentations?.cityName ?? item.name
+        return Self.firstNonBlank(item.addressRepresentations?.cityWithContext, item.addressRepresentations?.cityName, item.name)
+    }
+
+    static func firstNonBlank(_ candidates: String?...) -> String? {
+        candidates.lazy.compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }.first { !$0.isEmpty }
     }
 
     func search(_ query: String) async -> [Place] {
@@ -56,7 +60,7 @@ final class Geocoder {
 
     static func place(from item: MKMapItem, fallbackName: String) -> Place {
         let coordinate = item.location.coordinate
-        let name = item.addressRepresentations?.cityWithContext ?? item.name ?? fallbackName
+        let name = firstNonBlank(item.addressRepresentations?.cityWithContext, item.name) ?? fallbackName
         return Place(name: name, latitude: coordinate.latitude, longitude: coordinate.longitude)
     }
 }

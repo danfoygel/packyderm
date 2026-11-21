@@ -20,8 +20,9 @@ struct DetectedTrip: Identifiable, Hashable {
     var suggestedName: String {
         var names: [String] = []
         for leg in legs {
-            let short = leg.place.name.components(separatedBy: ",").first ?? leg.place.name
-            if !names.contains(short) { names.append(short) }
+            let short = (leg.place.name.components(separatedBy: ",").first ?? leg.place.name)
+                .trimmingCharacters(in: .whitespaces)
+            if !short.isEmpty, !names.contains(short) { names.append(short) }
         }
         return names.prefix(3).joined(separator: " & ")
     }
@@ -30,10 +31,12 @@ struct DetectedTrip: Identifiable, Hashable {
 /// Reads upcoming calendar events and guesses where the user will be on each day.
 ///
 /// Signals, strongest first:
-///  - stays: hotel/Airbnb events, or multi-day events with a location
-///  - flights: "Flight to Denver", "BOS → DEN" (you're at the destination from that day on)
+///  - flights: "Flight to Denver", "BOS → DEN" (you're at the destination from that day until the next flight)
+///  - lodging: hotel/Airbnb events
+///  - stays: multi-day events with a location, "Trip to Paris"
 ///  - ordinary events with a location far from home
 /// Away days separated by short gaps are joined into a trip; a flight back home ends one.
+/// Other people's events (coworkers' PTO on a shared calendar, invites you're not on) are ignored.
 @MainActor
 final class CalendarTripDetector {
     private let store = EKEventStore()
@@ -46,6 +49,10 @@ final class CalendarTripDetector {
     var sameLegKm: Double = 40
     /// Days without an event between away days that still count as one trip.
     var maxGapDays = 2
+    /// A flight followed by another flight within this many days means you stay at its destination in between.
+    var maxFlightTripDays = 30
+    /// While at a flight's destination, weaker signals farther than this (km) are ignored as someone else's.
+    var sideTripKm: Double = 300
 
     static var hasAccess: Bool {
         EKEventStore.authorizationStatus(for: .event) == .fullAccess
@@ -56,7 +63,8 @@ final class CalendarTripDetector {
         return (try? await store.requestFullAccessToEvents()) ?? false
     }
 
-    private enum Kind: Int { case event = 1, flight = 2, stay = 3 }
+    /// `carried`: a day between a flight out and the next flight, spent at the flight's destination.
+    private enum Kind: Int { case carried = 0, event, stay, lodging, flight }
 
     private struct Signal {
         var kind: Kind
@@ -89,7 +97,7 @@ final class CalendarTripDetector {
     private func signal(for event: EKEvent, home: Place) async -> Signal? {
         let title = event.title ?? ""
         let days = coveredDays(event)
-        guard !days.isEmpty else { return nil }
+        guard !days.isEmpty, !Self.isSomeoneElses(event) else { return nil }
 
         var kind: Kind = .event
         var place: Place?
@@ -100,8 +108,16 @@ final class CalendarTripDetector {
         } else if Self.looksLikeFlight(title) {
             // A flight we can't parse; its location is usually the departure airport.
             return nil
+        } else if Self.looksLikeAbsence(title) && Self.tripDestination(in: title) == nil {
+            // "Kate - PTO", "Nalini OOO": availability notices, usually a coworker's on a shared calendar.
+            // Any location on them is an office or someone's home, not where you'll be.
+            return nil
         } else {
-            if Self.looksLikeStay(title) || days.count > 1 { kind = .stay }
+            if Self.looksLikeStay(title) {
+                kind = .lodging
+            } else if days.count > 1 {
+                kind = .stay
+            }
             place = await resolveLocation(of: event)
             if place == nil, let named = Self.tripDestination(in: title) {
                 kind = .stay
@@ -119,7 +135,8 @@ final class CalendarTripDetector {
 
     private func resolveLocation(of event: EKEvent) async -> Place? {
         if let geo = event.structuredLocation?.geoLocation {
-            let name = await geocoder.cityName(for: geo) ?? event.structuredLocation?.title ?? event.location ?? "Unknown"
+            let city = await geocoder.cityName(for: geo)
+            let name = Geocoder.firstNonBlank(city, event.structuredLocation?.title, event.location) ?? "Unknown"
             return Place(name: name, latitude: geo.coordinate.latitude, longitude: geo.coordinate.longitude)
         }
         guard let location = event.location?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -143,7 +160,10 @@ final class CalendarTripDetector {
 
     // MARK: Signals → trips
 
-    private func buildTrips(from signals: [Signal], today: Date) -> [DetectedTrip] {
+    private func buildTrips(from allSignals: [Signal], today: Date) -> [DetectedTrip] {
+        let stays = flightStays(in: allSignals)
+        let signals = withoutFarSignals(allSignals, during: stays) + stays
+
         // Best away signal per day.
         var byDay: [Date: Signal] = [:]
         var homeDays: Set<Date> = []
@@ -209,6 +229,39 @@ final class CalendarTripDetector {
         }
     }
 
+    /// Between a flight out and the next flight, you're at the flight's destination.
+    private func flightStays(in signals: [Signal]) -> [Signal] {
+        let flights = signals.filter { $0.kind == .flight }.sorted { $0.start < $1.start }
+        var stays: [Signal] = []
+        for (flight, next) in zip(flights, flights.dropFirst()) where !flight.isHome {
+            let first = flight.days[0]
+            let gap = calendar.dateComponents([.day], from: first, to: next.days[0]).day ?? 0
+            guard gap > 0, gap <= maxFlightTripDays else { continue }
+            let days = (0..<gap).compactMap { calendar.date(byAdding: .day, value: $0, to: first) }
+            stays.append(Signal(kind: .carried, place: flight.place, start: flight.start, days: days, title: flight.title, isHome: false))
+        }
+        return stays
+    }
+
+    /// Drops days of ordinary events and multi-day events that are far from where your flights put you;
+    /// those are usually other people's plans on shared calendars. Hotel bookings still count, since you may
+    /// have moved on by train or car.
+    private func withoutFarSignals(_ signals: [Signal], during stays: [Signal]) -> [Signal] {
+        var destinationByDay: [Date: Place] = [:]
+        for stay in stays {
+            for day in stay.days { destinationByDay[day] = stay.place }
+        }
+        return signals.compactMap { signal -> Signal? in
+            guard signal.kind == .event || signal.kind == .stay else { return signal }
+            var kept = signal
+            kept.days = signal.days.filter { day in
+                guard let destination = destinationByDay[day] else { return true }
+                return signal.place.distanceKm(to: destination) <= sideTripKm
+            }
+            return kept.days.isEmpty ? nil : kept
+        }
+    }
+
     // MARK: Title parsing
 
     static func looksLikeFlight(_ title: String) -> Bool {
@@ -242,6 +295,20 @@ final class CalendarTripDetector {
         guard let match = title.firstMatch(of: /(?i)\b(?:trip|vacation|holiday|travel(?:ing)?|getaway)\s+(?:to|in)\s+(.+)/) else { return nil }
         let destination = String(match.1).trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
         return destination.isEmpty ? nil : destination
+    }
+
+    /// "Courtney PTO", "Nalini OOO", "JT - Sabbatical", "Out of office"
+    static func looksLikeAbsence(_ title: String) -> Bool {
+        title.range(
+            of: #"(?i)\b(pto|ooo|ooto|out of (the )?office|sabbatical|(on|parental|maternity|paternity|medical) leave)\b"#,
+            options: .regularExpression
+        ) != nil
+    }
+
+    /// An event someone else organized that you aren't invited to, e.g. on a coworker's or family member's calendar.
+    static func isSomeoneElses(_ event: EKEvent) -> Bool {
+        guard let organizer = event.organizer, !organizer.isCurrentUser else { return false }
+        return !(event.attendees ?? []).contains { $0.isCurrentUser }
     }
 
     static func isVirtualLocation(_ location: String) -> Bool {
