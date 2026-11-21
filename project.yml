@@ -1,0 +1,37 @@
+name: Packyderm
+options:
+  bundleIdPrefix: com.danfoygel
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: ZVU48K8YCD
+    CODE_SIGN_STYLE: Automatic
+targets:
+  Packyderm:
+    type: application
+    platform: iOS
+    sources:
+      - Packyderm
+    entitlements:
+      path: Packyderm/Packyderm.entitlements
+      properties:
+        com.apple.developer.weatherkit: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.danfoygel.packyderm
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Packyderm
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription: "Packyderm reads your calendar to figure out where you'll be on each day of a trip."
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: "Read-aloud mode listens for you to say yes or no for each item."
+        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: "Read-aloud mode recognizes yes or no answers to check off items."
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "Your location is used to set your home city, so trips can be told apart from home."
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
