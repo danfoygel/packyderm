@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="1024" height="1024">
+  <!-- Packyderm app icon: No. 049 "Suitcase, Lagoon" from the icon studies. Full-bleed; iOS applies the corner mask. -->
+  <defs>
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="30" y1="0" x2="70" y2="100">
+      <stop offset="0" stop-color="#1DBDBE"/><stop offset="1" stop-color="#0A6A8C"/>
+    </linearGradient>
+    <!-- Same gradient expressed in the elephant group's local coordinates, so the interior shows the background through. -->
+    <linearGradient id="bgLocal" gradientUnits="userSpaceOnUse" x1="30" y1="0" x2="70" y2="100" gradientTransform="scale(1.150802) translate(-3.742796,-5.382095)">
+      <stop offset="0" stop-color="#1DBDBE"/><stop offset="1" stop-color="#0A6A8C"/>
+    </linearGradient>
+    <radialGradient id="sheen" cx="28" cy="6" r="70" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.2"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="100" height="100" fill="url(#bg)"/>
+  <rect width="100" height="100" fill="url(#sheen)"/>
+  <g transform="translate(3.742796,5.382095) scale(0.868959)" stroke-linejoin="round" stroke-linecap="round">
+    <!-- Body, legs, head, handle, trunk, tail: outline pass, then fill pass -->
+    <g fill="#FFFFFF" stroke="#FFFFFF" stroke-width="9.666735">
+      <path d="M43,34H83A7,7 0 0 1 90,41V65A7,7 0 0 1 83,72H43A7,7 0 0 1 36,65V41A7,7 0 0 1 43,34Z"/>
+      <path d="M46,64H48A4,4 0 0 1 52,68V76A4,4 0 0 1 48,80H46A4,4 0 0 1 42,76V68A4,4 0 0 1 46,64Z"/>
+      <path d="M80,64H82A4,4 0 0 1 86,68V76A4,4 0 0 1 82,80H80A4,4 0 0 1 76,76V68A4,4 0 0 1 80,64Z"/>
+      <path d="M14,46a14,14 0 1 0 28,0a14,14 0 1 0 -28,0Z"/>
+    </g>
+    <path d="M54,34C54,24 72,24 72,34" fill="none" stroke="#FFFFFF" stroke-width="14.166735"/>
+    <path d="M18,52C13,60 13,70 18,75C21,78 25,77 24,73" fill="none" stroke="#FFFFFF" stroke-width="17.666735"/>
+    <path d="M90,50C95,52 96,57 94,61" fill="none" stroke="#FFFFFF" stroke-width="12.166735"/>
+    <g fill="url(#bgLocal)">
+      <path d="M43,34H83A7,7 0 0 1 90,41V65A7,7 0 0 1 83,72H43A7,7 0 0 1 36,65V41A7,7 0 0 1 43,34Z"/>
+      <path d="M46,64H48A4,4 0 0 1 52,68V76A4,4 0 0 1 48,80H46A4,4 0 0 1 42,76V68A4,4 0 0 1 46,64Z"/>
+      <path d="M80,64H82A4,4 0 0 1 86,68V76A4,4 0 0 1 82,80H80A4,4 0 0 1 76,76V68A4,4 0 0 1 80,64Z"/>
+      <path d="M14,46a14,14 0 1 0 28,0a14,14 0 1 0 -28,0Z"/>
+    </g>
+    <path d="M54,34C54,24 72,24 72,34" fill="none" stroke="url(#bgLocal)" stroke-width="4.5"/>
+    <path d="M18,52C13,60 13,70 18,75C21,78 25,77 24,73" fill="none" stroke="url(#bgLocal)" stroke-width="8"/>
+    <path d="M90,50C95,52 96,57 94,61" fill="none" stroke="url(#bgLocal)" stroke-width="2.5"/>
+    <!-- Ear -->
+    <path d="M33,36C43,34 47,46 43,54C40,59 34,58 32,54C35,48 35,42 33,36Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="9.666735"/>
+    <path d="M33,36C43,34 47,46 43,54C40,59 34,58 32,54C35,48 35,42 33,36Z" fill="url(#bgLocal)"/>
+    <!-- Eye -->
+    <circle cx="23" cy="43" r="2.243357" fill="#FFFFFF"/>
+    <!-- Checklist: one done, one to go -->
+    <rect x="52" y="40" width="10" height="10" rx="2.8" fill="#FFE066" stroke="#FFE066" stroke-width="2.4"/>
+    <path d="M54.5,45.3L56.4,47.1L59.7,43" fill="none" stroke="#0A6A8C" stroke-width="1.7"/>
+    <rect x="65.6" y="43.3" width="20" height="3.4" rx="1.7" fill="#FFFFFF" opacity="0.5"/>
+    <rect x="52" y="55" width="10" height="10" rx="2.8" fill="none" stroke="#FFFFFF" stroke-width="2.4"/>
+    <rect x="65.6" y="58.3" width="20" height="3.4" rx="1.7" fill="#FFFFFF" opacity="0.95"/>
+  </g>
+</svg>
