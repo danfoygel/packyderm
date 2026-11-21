@@ -34,7 +34,7 @@ Consecutive days within 40 km merge into one stop.
 
 ### Weather
 Uses WeatherKit. Days within the 10-day forecast use it directly. Later days use the average of the same dates over the
-past 3 years from WeatherKit's historical data (rain chance = share of those years with ≥1 mm). “Rain” in the summary is the chance of rain on at least one day.
+past 3 years from WeatherKit's historical data (rain chance = smoothed share of those years with ≥1 mm, so it never shows 0% or 100%). “Rain” in the summary is the chance of rain on at least one day.
 Trigger thresholds are stored in °C / % / cm / km/h and shown in your preferred units.
 
 ### Category state per trip

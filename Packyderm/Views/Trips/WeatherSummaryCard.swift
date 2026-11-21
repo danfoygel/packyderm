@@ -97,7 +97,7 @@ private struct DayWeatherRow: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .frame(width: 110, alignment: .leading)
+            .frame(width: 104, alignment: .leading)
             Image(systemName: day.symbolName)
                 .accessibilityLabel(day.condition)
                 .symbolRenderingMode(.multicolor)
@@ -105,9 +105,14 @@ private struct DayWeatherRow: View {
             Text("\(units.temp(day.low)) / \(units.temp(day.high))")
                 .font(.subheadline.monospacedDigit())
             Spacer()
-            Label("\(Int(day.rainChance.rounded()))%", systemImage: "drop.fill")
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(day.rainChance >= 50 ? .blue : .secondary)
+            HStack(spacing: 2) {
+                Image(systemName: "drop.fill")
+                Text("\(Int(day.rainChance.rounded()))%")
+                    .lineLimit(1)
+            }
+            .font(.caption.monospacedDigit())
+            .frame(width: 44, alignment: .trailing)
+            .foregroundStyle(day.rainChance >= 50 ? .blue : .secondary)
             if day.source == .historical {
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.caption2)

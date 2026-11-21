@@ -91,7 +91,8 @@ struct TripWeatherService {
             return DayWeather(
                 date: date, placeName: place.name,
                 high: avg(\.high), low: avg(\.low),
-                rainChance: Double(wetYears) / n * 100,
+                // Smoothed so a handful of years never reads as 0% or 100% certain.
+                rainChance: (Double(wetYears) + 0.5) / (n + 1) * 100,
                 precipitation: avg(\.precipitation), snowfall: avg(\.snowfall), maxWind: avg(\.maxWind),
                 uvIndex: nil,
                 symbolName: typical.symbolName, condition: typical.condition,
